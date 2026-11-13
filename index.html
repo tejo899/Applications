@@ -3,18 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
-  <meta name="theme-color" content="#020617" />
+  <meta name="theme-color" content="#090d16" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="GitDrop P2P" />
-  <title>GitDrop P2P — Serverless File Transfer for GitHub Pages</title>
+  <title>GitDrop — Simple Direct File Transfer</title>
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -31,489 +31,339 @@
   <style>
     body {
       font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background-color: #090d16;
     }
     .drop-active {
-      border-color: #38bdf8 !important;
-      background-color: rgba(56, 189, 248, 0.08) !important;
-    }
-    ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: rgba(15, 23, 42, 0.4);
-    }
-    ::-webkit-scrollbar-thumb {
-      background: rgba(100, 116, 139, 0.5);
-      border-radius: 9999px;
+      border-color: #f43f5e !important;
+      background-color: rgba(244, 63, 94, 0.08) !important;
     }
   </style>
 </head>
-<body class="min-h-screen bg-slate-950 text-slate-100 selection:bg-sky-500 selection:text-white flex flex-col">
+<body class="min-h-screen text-slate-100 flex flex-col selection:bg-rose-500 selection:text-white">
 
-  <!-- Toast Notification Container -->
+  <!-- Hidden Native File Inputs Placed OUTSIDE Dropzone so Mobile Never Loops or Crashes -->
+  <input id="fileInput" type="file" multiple class="hidden" onchange="handleFileSelect(event)" />
+  <input id="mediaInput" type="file" accept="image/*,video/*" multiple class="hidden" onchange="handleFileSelect(event)" />
+  <input id="cameraInput" type="file" accept="image/*" capture="environment" class="hidden" onchange="handleFileSelect(event)" />
+
+  <!-- Toast Container -->
   <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
 
-  <!-- QR Code Modal -->
-  <div id="qrModal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl relative">
+  <!-- QR Code Full Modal -->
+  <div id="qrModal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-950/85 backdrop-blur-sm p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-sm w-full p-6 shadow-2xl">
       <div class="flex items-center justify-between mb-4">
         <div>
-          <h3 class="text-base font-semibold text-white">Scan to Pair Device</h3>
-          <p class="text-xs text-slate-400">Open this GitHub Pages link on your phone or second PC</p>
+          <h3 class="text-base font-bold text-white">Scan with Phone Camera</h3>
+          <p class="text-xs text-slate-400">Auto-connects both devices immediately</p>
         </div>
-        <button id="closeQrModalBtn" type="button" onclick="toggleQrModal(false)" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">
+        <button id="closeQrModalBtn" type="button" onclick="toggleQrModal(false)" class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
       </div>
-      <div class="bg-white p-4 rounded-xl flex items-center justify-center mx-auto w-fit shadow-inner">
+      <div class="bg-white p-4 rounded-2xl flex items-center justify-center mx-auto w-fit">
         <canvas id="qrCanvas" width="200" height="200" class="max-w-full h-auto"></canvas>
       </div>
       <div class="mt-4 text-center">
-        <div class="text-xs uppercase tracking-wider text-slate-400">Room Pairing Code</div>
-        <div id="modalRoomCodeDisplay" class="font-mono text-2xl font-bold text-sky-400 tracking-widest mt-0.5">------</div>
-        <p id="modalShareUrlDisplay" class="mt-2 text-xs font-mono text-slate-400 break-all bg-slate-950/80 px-3 py-2 rounded-lg border border-slate-800"></p>
+        <div class="text-xs uppercase tracking-wider text-slate-400">6-Digit Key</div>
+        <div id="modalRoomCodeDisplay" class="font-mono text-3xl font-extrabold text-rose-400 tracking-widest mt-1">------</div>
+        <p id="modalShareUrlDisplay" class="mt-2 text-[11px] font-mono text-slate-400 break-all bg-slate-950 px-3 py-2 rounded-xl border border-slate-800"></p>
       </div>
       <div class="mt-5 flex gap-2">
-        <button type="button" onclick="copyShareLink()" class="flex-1 py-2 px-3 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs transition">
+        <button type="button" onclick="copyShareLink()" class="flex-1 py-2.5 px-3 rounded-xl bg-rose-500 hover:bg-rose-400 text-white font-semibold text-xs transition">
           Copy Pairing URL
         </button>
-        <button type="button" onclick="toggleQrModal(false)" class="py-2 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs transition">
+        <button type="button" onclick="toggleQrModal(false)" class="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs transition">
           Done
         </button>
       </div>
     </div>
   </div>
 
-  <!-- Top Navigation Bar -->
+  <!-- Minimal Send-Anywhere Style Top Bar -->
   <header class="border-b border-slate-800/80 bg-slate-900/70 backdrop-blur sticky top-0 z-30">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-rose-500 to-orange-500 flex items-center justify-center shadow-lg shadow-rose-500/20">
           <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
           </svg>
         </div>
         <div>
-          <div class="flex items-center gap-2">
-            <h1 class="text-base sm:text-lg font-bold tracking-tight text-white">GitDrop P2P</h1>
-            <span class="text-[11px] font-mono uppercase px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/30">Static &bull; WebRTC</span>
-          </div>
-          <p class="text-xs text-slate-400 hidden sm:block">Direct browser-to-browser file &amp; text transfer built for GitHub Pages</p>
+          <span class="text-base font-extrabold tracking-tight text-white">SendDirect</span>
+          <span class="ml-1.5 text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30">Turbo P2P</span>
         </div>
       </div>
 
-      <!-- Mode Switcher & Connection Badge -->
-      <div class="flex items-center gap-2 flex-wrap">
-        <div id="connectionBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/90 border border-slate-700 text-xs font-medium">
+      <div class="flex items-center gap-2">
+        <div id="connectionBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800 border border-slate-700 text-xs font-semibold">
           <span id="connectionDot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-          <span id="connectionStatusText" class="text-slate-200">Initializing...</span>
+          <span id="connectionStatusText" class="text-slate-200">Ready to Pair</span>
         </div>
 
-        <button id="simpleUiToggleBtn" type="button" onclick="toggleSimpleUiMode()" class="px-3 py-1.5 rounded-xl border border-sky-500/40 bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 text-xs font-semibold transition flex items-center gap-1.5" title="Switch between Simple Guided UI and Advanced Controls">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
+        <button id="wakeLockBtn" type="button" onclick="toggleWakeLock()" class="px-2.5 py-1.5 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-800 text-slate-300 text-xs font-medium transition flex items-center gap-1" title="Keep mobile screen awake">
+          <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+          <span id="wakeLockLabel" class="hidden sm:inline">Keep Awake: OFF</span>
+        </button>
+
+        <button id="simpleUiToggleBtn" type="button" onclick="toggleSimpleUiMode()" class="px-2.5 py-1.5 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-800 text-slate-300 text-xs font-medium transition">
           <span id="simpleUiBtnLabel">Simple UI: ON</span>
         </button>
-
-        <button id="wakeLockBtn" type="button" onclick="toggleWakeLock()" class="px-3 py-1.5 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-800 text-slate-300 text-xs font-medium transition flex items-center gap-1.5" title="Keep mobile screen awake during large transfers">
-          <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-          <span id="wakeLockLabel">Keep Awake: OFF</span>
-        </button>
-
-        <button id="loopbackToggleBtn" type="button" onclick="toggleLoopbackMode()" class="px-3 py-1.5 rounded-xl border border-indigo-500/40 bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 text-xs font-medium transition flex items-center gap-1.5" title="Simulate a second connected device on this page to test file transfers immediately">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
-          <span id="loopbackBtnLabel">Loopback Test: ON</span>
-        </button>
       </div>
-    </div>
-
-    <!-- Navigation Tabs -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 flex items-center gap-1 overflow-x-auto border-t border-slate-800/50 pt-1">
-      <button type="button" id="tabBtn-transfer" onclick="switchTab('transfer')" class="px-4 py-2 text-xs sm:text-sm font-medium border-b-2 border-sky-400 text-sky-400 whitespace-nowrap transition">
-        Transfer Hub
-      </button>
-      <button type="button" id="tabBtn-links" onclick="switchTab('links')" class="px-4 py-2 text-xs sm:text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 whitespace-nowrap transition">
-        GitHub File Link Generator
-      </button>
-      <button type="button" id="tabBtn-deploy" onclick="switchTab('deploy')" class="px-4 py-2 text-xs sm:text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 whitespace-nowrap transition">
-        Host on GitHub Pages
-      </button>
     </div>
   </header>
 
-  <!-- Main Workspace -->
-  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
+  <!-- Main Content -->
+  <main class="flex-1 max-w-5xl w-full mx-auto px-4 py-6 space-y-6">
 
-    <!-- TAB 1: TRANSFER HUB -->
-    <section id="tabPanel-transfer" class="space-y-5">
-
-      <!-- Simple 3-Step Visual Guide Banner -->
-      <div id="quickGuideBanner" class="bg-gradient-to-r from-sky-500/10 via-indigo-500/10 to-emerald-500/10 border border-slate-800 rounded-2xl p-4">
-        <div class="flex items-center justify-between mb-3">
-          <div class="flex items-center gap-2">
-            <span class="px-2 py-0.5 rounded-md bg-sky-500 text-slate-950 font-bold text-xs">HOW IT WORKS</span>
-            <h2 class="text-sm font-semibold text-white">Send Files Between Phone &amp; PC in 3 Simple Steps</h2>
-          </div>
-          <button type="button" onclick="toggleGuideBanner()" id="toggleGuideBtn" class="text-xs text-slate-400 hover:text-white transition">Hide Guide</button>
+    <!-- STEP 1: ESTABLISH CONNECTION FIRST (Send-Anywhere Style Dual Key Card) -->
+    <section class="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xl">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <div class="flex items-center gap-2">
+          <span id="step1StatusPill" class="px-2.5 py-1 rounded-full bg-rose-500 text-white font-bold text-xs">1. CONNECT DEVICES</span>
+          <span id="peerCountBadge" class="text-xs text-slate-400 font-medium">Enter the 6-digit key on either device to link them</span>
         </div>
-        <div id="guideStepsGrid" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3 flex items-start gap-3">
-            <span class="w-6 h-6 rounded-full bg-sky-500 text-slate-950 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">1</span>
-            <div>
-              <div class="text-xs font-semibold text-white">Open &amp; Pair Devices</div>
-              <p class="text-[11px] text-slate-400 mt-0.5">Open your GitHub Pages link on both devices. Scan the <strong class="text-sky-300">QR Code</strong> on your phone or type the <strong class="text-sky-300">6-digit code</strong> and tap <strong class="text-emerald-300">Connect Peer</strong>.</p>
-            </div>
-          </div>
-          <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3 flex items-start gap-3">
-            <span class="w-6 h-6 rounded-full bg-indigo-500 text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">2</span>
-            <div>
-              <div class="text-xs font-semibold text-white">Pick File or Photo</div>
-              <p class="text-[11px] text-slate-400 mt-0.5">Tap <strong class="text-sky-300">All Files</strong>, <strong class="text-indigo-300">Photos/Video</strong>, or <strong class="text-emerald-300">Camera</strong> on mobile (or drag &amp; drop on PC), then tap <strong class="text-sky-300">Send Queued Files</strong>.</p>
-            </div>
-          </div>
-          <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3 flex items-start gap-3">
-            <span class="w-6 h-6 rounded-full bg-emerald-500 text-slate-950 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">3</span>
-            <div>
-              <div class="text-xs font-semibold text-white">Save Instantly</div>
-              <p class="text-[11px] text-slate-400 mt-0.5">Watch the live progress bar finish and tap <strong class="text-emerald-300">Save</strong> (or turn on <strong class="text-slate-200">Auto-download</strong>) on the receiving device.</p>
-            </div>
-          </div>
+        <div class="flex items-center gap-2">
+          <button id="disconnectPeerBtn" type="button" onclick="disconnectPeers()" class="hidden px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 font-semibold text-xs transition">
+            Disconnect
+          </button>
+          <button id="loopbackToggleBtn" type="button" onclick="toggleLoopbackMode()" class="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800/70 hover:bg-slate-800 text-slate-400 text-[11px] font-mono transition">
+            <span id="loopbackBtnLabel">Loopback Test: ON</span>
+          </button>
         </div>
       </div>
 
-      <!-- Top Pairing & Session Bar -->
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <!-- Your Device Pairing Card -->
-        <div class="lg:col-span-7 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div class="space-y-1">
-            <div class="flex items-center gap-2">
-              <span class="px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 font-bold text-[11px]">STEP 1A</span>
-              <span class="text-xs font-semibold uppercase tracking-wider text-slate-300">Your Code (Show to Other Device)</span>
-              <span id="networkModePill" class="text-[11px] px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-mono">Loopback + P2P</span>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Left Box: Your 6-Digit Key -->
+        <div class="bg-slate-950 border border-slate-800/90 rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-4">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <div class="text-xs font-semibold uppercase tracking-wider text-slate-400">Your 6-Digit Key</div>
+              <div id="myPairingCode" class="font-mono text-3xl sm:text-4xl font-extrabold tracking-[0.2em] text-rose-400 mt-1">------</div>
+              <p class="text-xs text-slate-400 mt-1">Type this key on your other device or scan QR</p>
             </div>
-            <div class="flex items-baseline gap-3">
-              <span id="myPairingCode" class="font-mono text-2xl sm:text-3xl font-bold tracking-widest text-sky-400">------</span>
-              <span id="peerCountBadge" class="text-xs text-emerald-400 font-medium">1 virtual peer ready</span>
-            </div>
-            <p class="text-xs text-slate-400">Share this code or QR link with another device to open an encrypted WebRTC data channel.</p>
+            <button type="button" onclick="toggleQrModal(true)" class="p-2.5 rounded-2xl bg-white text-slate-950 hover:bg-slate-200 transition shadow-md shrink-0" title="Show QR Code">
+              <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+            </button>
           </div>
-
-          <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <button type="button" onclick="copyPairingCode()" class="flex-1 sm:flex-initial px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-medium transition flex items-center justify-center gap-1.5">
-              <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="copyPairingCode()" class="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-semibold transition">
               Copy Code
             </button>
-            <button type="button" onclick="shareOrCopyPairingLink()" class="flex-1 sm:flex-initial px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-medium transition flex items-center justify-center gap-1.5">
-              <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+            <button type="button" onclick="shareOrCopyPairingLink()" class="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-semibold transition">
               Share Link
             </button>
-            <button type="button" onclick="toggleQrModal(true)" class="px-3 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-semibold transition flex items-center justify-center gap-1.5">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+            <button type="button" onclick=" toggleQrModal(true)" class="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition">
               QR Code
             </button>
-            <button type="button" onclick="regeneratePairingCode()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition" title="Generate new pairing code">
+            <button type="button" onclick="regeneratePairingCode()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition" title="New Key">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
             </button>
           </div>
         </div>
 
-        <!-- Connect to Remote Peer Card -->
-        <div class="lg:col-span-5 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-3">
+        <!-- Right Box: Enter Other Device's Key -->
+        <div class="bg-slate-950 border border-slate-800/90 rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-4">
           <div>
-            <div class="flex items-center gap-2">
-              <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[11px]">STEP 1B</span>
-              <label for="remoteCodeInput" class="block text-xs font-semibold uppercase tracking-wider text-slate-300">Or Enter Other Device's Code</label>
-            </div>
-            <p class="text-xs text-slate-400 mt-0.5">Enter the 6-digit pairing code shown on the other device</p>
-          </div>
-          <div class="flex items-center gap-2">
+            <label for="remoteCodeInput" class="block text-xs font-semibold uppercase tracking-wider text-slate-400">Input Key from Other Device</label>
             <input
               id="remoteCodeInput"
               type="text"
               maxlength="7"
-              placeholder="e.g. 7K9M2X"
-              class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 font-mono text-sm uppercase tracking-wider focus:outline-none focus:border-sky-400"
+              placeholder="ENTER 6-DIGIT KEY"
+              class="mt-2 w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-xl font-bold uppercase tracking-[0.18em] text-center focus:outline-none focus:border-rose-500"
             />
-            <button id="connectPeerBtn" type="button" onclick="connectToRemotePeer()" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs whitespace-nowrap transition">
-              Connect Peer
-            </button>
-            <button id="disconnectPeerBtn" type="button" onclick="disconnectPeers()" class="hidden px-3 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 font-medium text-xs whitespace-nowrap transition">
-              Disconnect
-            </button>
           </div>
-        </div>
-      </div>
-
-      <!-- Main Send & Receive Columns -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        <!-- LEFT COLUMN: SEND FILES & TEXT -->
-        <div class="space-y-6">
-          <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
-            <div class="flex items-center justify-between flex-wrap gap-2">
-              <div>
-                <h2 class="text-base font-semibold text-white flex items-center gap-2">
-                  <span class="px-2 py-0.5 rounded bg-sky-500 text-slate-950 font-bold text-xs">STEP 2</span>
-                  Send Files
-                </h2>
-                <p class="text-xs text-slate-400">Choose any file or photo and tap Send</p>
-              </div>
-              <div id="advancedChunkBox" class="hidden items-center gap-2">
-                <label for="chunkSizeSelect" class="text-xs text-slate-400">Chunk:</label>
-                <select id="chunkSizeSelect" onchange="updateChunkSize()" class="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs font-mono text-slate-200 focus:outline-none focus:border-sky-400">
-                  <option value="16384">16 KB</option>
-                  <option value="65536" selected>64 KB (Fast)</option>
-                  <option value="262144">256 KB (LAN)</option>
-                </select>
-              </div>
-            </div>
-
-            <!-- Drag & Drop Zone + Mobile Pickers -->
-            <div
-              id="dropZone"
-              onclick="triggerFileInput()"
-              class="border-2 border-dashed border-slate-700/80 hover:border-sky-400/70 rounded-2xl p-5 sm:p-6 text-center cursor-pointer transition bg-slate-950/40 group"
-            >
-              <input id="fileInput" type="file" multiple class="hidden" onchange="handleFileSelect(event)" />
-              <input id="mediaInput" type="file" accept="image/*,video/*" multiple class="hidden" onchange="handleFileSelect(event)" />
-              <input id="cameraInput" type="file" accept="image/*" capture="environment" class="hidden" onchange="handleFileSelect(event)" />
-              <div class="w-12 h-12 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center mx-auto mb-3 group-hover:scale-105 transition">
-                <svg class="w-6 h-6 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
-                </svg>
-              </div>
-              <p class="text-sm font-medium text-slate-200">Tap to choose files or <span class="text-sky-400 underline">drop here</span></p>
-              <p class="text-xs text-slate-400 mt-1">Streamed in 64 KB slices — works on Android, iOS Safari &amp; Desktop</p>
-            </div>
-
-            <!-- Mobile Action Buttons (Files / Gallery / Camera / Native Share) -->
-            <div class="grid grid-cols-3 gap-2">
-              <button type="button" onclick="triggerFileInput()" class="py-2 px-3 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-100 text-xs font-medium transition flex items-center justify-center gap-1.5">
-                <svg class="w-4 h-4 text-sky-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
-                <span>All Files</span>
-              </button>
-              <button type="button" onclick="triggerMediaInput()" class="py-2 px-3 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-100 text-xs font-medium transition flex items-center justify-center gap-1.5">
-                <svg class="w-4 h-4 text-indigo-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                <span>Photos/Video</span>
-              </button>
-              <button type="button" onclick="triggerCameraInput()" class="py-2 px-3 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-100 text-xs font-medium transition flex items-center justify-center gap-1.5">
-                <svg class="w-4 h-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                <span>Camera</span>
-              </button>
-            </div>
-
-            <!-- File Size Limits & Memory Guard Bar -->
-            <div class="bg-slate-950/80 border border-slate-800/90 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
-              <span><strong class="text-slate-200">Server Limit:</strong> Unlimited (Direct P2P)</span>
-              <span><strong class="text-sky-300">Mobile RAM Safe:</strong> ~500 MB/file</span>
-              <span><strong class="text-emerald-300">Desktop RAM Safe:</strong> ~2 GB/file</span>
-            </div>
-
-            <!-- Primary Send CTA + Demo Controls -->
-            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-1">
-              <button id="sendAllBtn" type="button" onclick="sendQueuedFiles()" class="flex-1 py-2.5 px-5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-sm shadow-lg shadow-sky-500/20 transition flex items-center justify-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
-                Send Queued Files
-              </button>
-              <button type="button" onclick="clearOutgoingQueue()" class="py-2.5 px-3.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-300 text-xs font-medium transition">
-                Clear Queue
-              </button>
-            </div>
-            <div id="advancedSampleBar" class="hidden flex-wrap items-center gap-2 pt-1">
-              <span class="text-[11px] text-slate-500">Test Payloads:</span>
-              <button type="button" onclick="addSampleTestFile('firmware')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium transition">
-                + Sample Firmware (.bin)
-              </button>
-              <button type="button" onclick="addSampleTestFile('config')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium transition">
-                + Sample Telemetry (.json)
-              </button>
-            </div>
-
-            <!-- Outgoing Queue List -->
-            <div class="space-y-2">
-              <div class="flex items-center justify-between text-xs text-slate-400 border-b border-slate-800 pb-1.5">
-                <span>Outgoing Queue (<span id="outgoingCount">0</span>)</span>
-                <span id="outgoingTotalSize" class="font-mono">0 B</span>
-              </div>
-              <div id="outgoingFileList" class="space-y-2 max-h-64 overflow-y-auto pr-1"></div>
-            </div>
-          </div>
-
-          <!-- Instant Text / Clipboard Bridge -->
-          <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-3">
-            <div class="flex items-center justify-between">
-              <div>
-                <h3 class="text-sm font-semibold text-white">Instant Text &amp; Link Bridge</h3>
-                <p class="text-xs text-slate-400">Push clipboard snippets, URLs, or CLI commands to the paired device</p>
-              </div>
-              <button type="button" onclick="sendTextSnippet()" class="px-3.5 py-1.5 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-semibold text-xs transition">
-                Send Snippet
-              </button>
-            </div>
-            <textarea
-              id="snippetInput"
-              rows="2"
-              placeholder="Paste a link, command, or note to beam across devices..."
-              class="w-full rounded-xl bg-slate-950 border border-slate-800 p-3 text-xs font-mono text-slate-200 focus:outline-none focus:border-sky-400"
-            ></textarea>
-          </div>
-        </div>
-
-        <!-- RIGHT COLUMN: RECEIVE INBOX & TELEMETRY -->
-        <div class="space-y-6">
-          <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
-            <div class="flex items-center justify-between flex-wrap gap-2">
-              <div>
-                <h2 class="text-base font-semibold text-white flex items-center gap-2">
-                  <span class="px-2 py-0.5 rounded bg-emerald-500 text-slate-950 font-bold text-xs">STEP 3</span>
-                  Received Files &amp; Snippets
-                </h2>
-                <p class="text-xs text-slate-400">Incoming transfers reassemble in browser memory for instant saving</p>
-              </div>
-              <div class="flex items-center gap-3">
-                <label class="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer select-none">
-                  <input id="autoDownloadToggle" type="checkbox" onchange="toggleAutoDownload()" class="rounded border-slate-700 bg-slate-950 text-sky-500 focus:ring-0" />
-                  Auto-download
-                </label>
-                <button id="downloadAllZipBtn" type="button" onclick="downloadAllReceivedAsZip()" class="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs font-medium transition">
-                  Download All (.zip)
-                </button>
-              </div>
-            </div>
-
-            <!-- Live Transfer Metrics Strip -->
-            <div class="grid grid-cols-3 gap-2.5 bg-slate-950/70 border border-slate-800/80 rounded-xl p-3">
-              <div>
-                <div class="text-[11px] text-slate-400 uppercase">Throughput</div>
-                <div id="metricSpeed" class="font-mono text-sm sm:text-base font-semibold text-sky-400">0.0 MB/s</div>
-              </div>
-              <div>
-                <div class="text-[11px] text-slate-400 uppercase">Transferred</div>
-                <div id="metricTransferred" class="font-mono text-sm sm:text-base font-semibold text-slate-100">0 B</div>
-              </div>
-              <div>
-                <div class="text-[11px] text-slate-400 uppercase">Completed</div>
-                <div id="metricFilesDone" class="font-mono text-sm sm:text-base font-semibold text-emerald-400">0 files</div>
-              </div>
-            </div>
-
-            <!-- Received Files List -->
-            <div class="space-y-2">
-              <div class="flex items-center justify-between text-xs text-slate-400 border-b border-slate-800 pb-1.5">
-                <span>Received Inbox (<span id="receivedCount">0</span>)</span>
-                <button type="button" onclick="clearReceivedInbox()" class="text-xs text-slate-400 hover:text-slate-200">Clear Inbox</button>
-              </div>
-              <div id="receivedFileList" class="space-y-2 max-h-64 overflow-y-auto pr-1"></div>
-            </div>
-
-            <!-- Received Snippets Feed -->
-            <div class="space-y-2 pt-2 border-t border-slate-800/80">
-              <div class="flex items-center justify-between text-xs text-slate-400">
-                <span>Received Text Snippets (<span id="snippetCount">0</span>)</span>
-              </div>
-              <div id="receivedSnippetList" class="space-y-2 max-h-40 overflow-y-auto pr-1"></div>
-            </div>
-          </div>
-
-          <!-- Transfer Activity Log (Shown in Advanced UI Mode) -->
-          <div id="advancedLogCard" class="hidden bg-slate-900/90 border border-slate-800 rounded-2xl p-4 space-y-2">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">WebRTC / DataChannel Log</span>
-              <button type="button" onclick="clearTransferLog()" class="text-xs text-slate-400 hover:text-slate-200">Clear</button>
-            </div>
-            <div id="transferLog" class="font-mono text-[11px] text-slate-300 bg-slate-950 border border-slate-800 rounded-xl p-3 h-28 overflow-y-auto space-y-1"></div>
-          </div>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- TAB 2: GITHUB REPO / RELEASE FILE LINK GENERATOR -->
-    <section id="tabPanel-links" class="hidden space-y-6">
-      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 space-y-5">
-        <div class="max-w-3xl">
-          <h2 class="text-lg font-semibold text-white">GitHub Repository &amp; Release Download Card Generator</h2>
-          <p class="text-xs sm:text-sm text-slate-400 mt-1">
-            Hosting static files (such as <code class="text-sky-300 font-mono">.zip</code> packages, <code class="text-sky-300 font-mono">.apk</code> builds, or <code class="text-sky-300 font-mono">.bin</code> firmware) directly inside your GitHub repository or Releases? Generate a direct-download link and QR code for mobile devices.
-          </p>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label for="ghOwnerInput" class="block text-xs font-medium text-slate-300 mb-1">GitHub Username / Org</label>
-            <input id="ghOwnerInput" type="text" value="tejo899" oninput="updateRepoLinkBuilder()" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-100 focus:outline-none focus:border-sky-400" />
-          </div>
-          <div>
-            <label for="ghRepoInput" class="block text-xs font-medium text-slate-300 mb-1">Repository Name</label>
-            <input id="ghRepoInput" type="text" value="Applications" oninput="updateRepoLinkBuilder()" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-100 focus:outline-none focus:border-sky-400" />
-          </div>
-          <div>
-            <label for="ghFilePathInput" class="block text-xs font-medium text-slate-300 mb-1">File Path in Repo (main branch)</label>
-            <input id="ghFilePathInput" type="text" value="releases/app-release.zip" oninput="updateRepoLinkBuilder()" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-100 focus:outline-none focus:border-sky-400" />
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-          <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-2">
-            <div class="text-xs font-semibold text-sky-400 uppercase">GitHub Pages Direct URL</div>
-            <p id="ghPagesUrlPreview" class="font-mono text-xs text-slate-200 break-all"></p>
-            <button type="button" onclick="copyTextById('ghPagesUrlPreview', 'GitHub Pages file URL copied')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 font-medium transition">
-              Copy Pages Download URL
-            </button>
-          </div>
-          <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-2">
-            <div class="text-xs font-semibold text-emerald-400 uppercase">Raw GitHub Content URL</div>
-            <p id="ghRawUrlPreview" class="font-mono text-xs text-slate-200 break-all"></p>
-            <button type="button" onclick="copyTextById('ghRawUrlPreview', 'Raw GitHub URL copied')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 font-medium transition">
-              Copy Raw File URL
-            </button>
-          </div>
+          <button id="connectPeerBtn" type="button" onclick="connectToRemotePeer()" class="w-full py-3 px-5 rounded-xl bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-400 hover:to-orange-400 text-white font-bold text-sm shadow-lg shadow-rose-500/25 transition">
+            Connect Peer
+          </button>
         </div>
       </div>
     </section>
 
-    <!-- TAB 3: HOST ON GITHUB PAGES GUIDE -->
-    <section id="tabPanel-deploy" class="hidden space-y-6">
-      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 space-y-5">
-        <div>
-          <h2 class="text-lg font-semibold text-white">Deploy This Single-File Web App on GitHub Pages</h2>
-          <p class="text-xs sm:text-sm text-slate-400 mt-1">
-            Because this entire file transfer app is packed into a single <code class="text-sky-300 font-mono">index.html</code> file using WebRTC (PeerJS), it runs 100% free on GitHub Pages with zero backend configuration.
-          </p>
+    <!-- STEP 2: SEND & RECEIVE WORKSPACE (Either device can send or receive once connected!) -->
+    <section id="tabPanel-transfer" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+      <!-- SEND CARD (Giant '+' Button like Send Anywhere) -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 sm:p-6 flex flex-col justify-between space-y-4 shadow-xl">
+        <div class="flex items-center justify-between">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-rose-400">SEND</span>
+            <h2 class="text-lg font-bold text-white">Send Files Anywhere</h2>
+          </div>
+          <span id="outgoingTotalSize" class="font-mono text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-300">0 B (<span id="outgoingCount">0</span>)</span>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-2">
-            <span class="text-xs font-mono px-2 py-0.5 rounded bg-sky-500/15 text-sky-300">Step 1</span>
-            <h3 class="text-sm font-semibold text-white">Save as index.html</h3>
-            <p class="text-xs text-slate-400">Download this file as <code class="text-slate-200 font-mono">index.html</code> and upload it to the root of a public GitHub repository.</p>
+        <!-- Crash-Safe Drop & Tap Area (Inputs are outside this div to prevent mobile event bubbling recursion) -->
+        <div
+          id="dropZone"
+          onclick="openNativeFilePicker(event)"
+          class="border-2 border-dashed border-slate-700 hover:border-rose-500/80 rounded-2xl p-6 text-center cursor-pointer transition bg-slate-950/60 group select-none"
+        >
+          <div class="w-16 h-16 rounded-full bg-gradient-to-br from-rose-500 to-orange-500 text-white flex items-center justify-center mx-auto mb-3 shadow-lg shadow-rose-500/25 group-hover:scale-105 transition">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+            </svg>
           </div>
-          <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-2">
-            <span class="text-xs font-mono px-2 py-0.5 rounded bg-sky-500/15 text-sky-300">Step 2</span>
-            <h3 class="text-sm font-semibold text-white">Enable GitHub Pages</h3>
-            <p class="text-xs text-slate-400">Open <strong class="text-slate-200">Settings &rarr; Pages</strong> in your repository, set Source to <strong class="text-slate-200">Deploy from a branch</strong>, and select <code class="text-slate-200 font-mono">main / (root)</code>.</p>
+          <p class="text-base font-bold text-white">Tap + to Add Files</p>
+          <p class="text-xs text-slate-400 mt-1">Or drag &amp; drop files here &bull; Full speed P2P</p>
+        </div>
+
+        <!-- Mobile Quick-Select Buttons (Direct Label Triggers — Zero JS Click Recursion!) -->
+        <div class="grid grid-cols-3 gap-2">
+          <button type="button" onclick="openNativeFilePicker(event)" class="py-2.5 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-semibold transition flex items-center justify-center gap-1.5 text-center">
+            <span>All Files</span>
+          </button>
+          <button type="button" onclick="triggerMediaInput(event)" class="py-2.5 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-semibold transition flex items-center justify-center gap-1.5 text-center">
+            <span>Photos/Video</span>
+          </button>
+          <button type="button" onclick="triggerCameraInput(event)" class="py-2.5 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-semibold transition flex items-center justify-center gap-1.5 text-center">
+            <span>Camera</span>
+          </button>
+        </div>
+
+        <!-- Outgoing File Queue -->
+        <div id="outgoingFileList" class="space-y-2 max-h-56 overflow-y-auto pr-1"></div>
+
+        <!-- Primary Send Button -->
+        <div class="flex items-center gap-2 pt-1">
+          <button id="sendAllBtn" type="button" onclick="sendQueuedFiles()" class="flex-1 py-3.5 px-5 rounded-2xl bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-400 hover:to-orange-400 text-white font-bold text-sm shadow-lg shadow-rose-500/25 transition flex items-center justify-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
+            Send Queued Files
+          </button>
+          <button type="button" onclick="clearOutgoingQueue()" class="py-3.5 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition">
+            Clear Queue
+          </button>
+        </div>
+      </div>
+
+      <!-- RECEIVE CARD -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 sm:p-6 flex flex-col justify-between space-y-4 shadow-xl">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-emerald-400">RECEIVE</span>
+            <h2 class="text-lg font-bold text-white">Incoming Files (<span id="receivedCount">0</span>)</h2>
           </div>
-          <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-2">
-            <span class="text-xs font-mono px-2 py-0.5 rounded bg-sky-500/15 text-sky-300">Step 3</span>
-            <h3 class="text-sm font-semibold text-white">Pair &amp; Transfer Anywhere</h3>
-            <p class="text-xs text-slate-400">Open your <code class="text-slate-200 font-mono">https://&lt;user&gt;.github.io/&lt;repo&gt;/</code> URL on any two devices, scan the QR code, and drop files.</p>
+          <div class="flex items-center gap-3">
+            <label class="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer select-none">
+              <input id="autoDownloadToggle" type="checkbox" checked onchange="toggleAutoDownload()" class="rounded border-slate-700 bg-slate-950 text-emerald-500 focus:ring-0" />
+              Auto-download
+            </label>
           </div>
         </div>
 
-        <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-2">
+        <!-- Live Speed & Progress Readout -->
+        <div class="grid grid-cols-3 gap-2 bg-slate-950 border border-slate-800 rounded-2xl p-3.5">
+          <div>
+            <div class="text-[10px] text-slate-400 uppercase font-semibold">Speed</div>
+            <div id="metricSpeed" class="font-mono text-sm sm:text-base font-bold text-rose-400">0.0 MB/s</div>
+          </div>
+          <div>
+            <div class="text-[10px] text-slate-400 uppercase font-semibold">Transferred</div>
+            <div id="metricTransferred" class="font-mono text-sm sm:text-base font-bold text-white">0 B</div>
+          </div>
+          <div>
+            <div class="text-[10px] text-slate-400 uppercase font-semibold">Done</div>
+            <div id="metricFilesDone" class="font-mono text-sm sm:text-base font-bold text-emerald-400">0 files</div>
+          </div>
+        </div>
+
+        <!-- Incoming / Received File List -->
+        <div id="receivedFileList" class="space-y-2 max-h-60 overflow-y-auto pr-1 flex-1"></div>
+
+        <!-- Receive Footer Actions -->
+        <div class="flex items-center gap-2 pt-1">
+          <button id="downloadAllZipBtn" type="button" onclick="downloadAllReceivedAsZip()" class="flex-1 py-3 px-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition">
+            Download All (.zip)
+          </button>
+          <button type="button" onclick="clearReceivedInbox()" class="py-3 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition">
+            Clear Inbox
+          </button>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- COLLAPSIBLE EXTRA TOOLS DRAWER (Keeps main screen 100% clean while preserving text snippets, logs, and GitHub tools) -->
+    <section id="extraToolsSection" class="hidden space-y-4 bg-slate-900/80 border border-slate-800 rounded-3xl p-5">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2 flex-wrap">
+          <button type="button" id="tabBtn-transfer" onclick="switchTab('transfer')" class="px-3 py-1.5 rounded-lg bg-slate-800 text-xs font-semibold text-rose-400">
+            Transfer Hub
+          </button>
+          <button type="button" id="tabBtn-links" onclick="switchTab('links')" class="px-3 py-1.5 rounded-lg bg-slate-800 text-xs font-semibold text-slate-300">
+            GitHub File Link Generator
+          </button>
+          <button type="button" id="tabBtn-deploy" onclick="switchTab('deploy')" class="px-3 py-1.5 rounded-lg bg-slate-800 text-xs font-semibold text-slate-300">
+            Host on GitHub Pages
+          </button>
+          <button type="button" id="toggleGuideBtn" onclick="toggleGuideBanner()" class="px-3 py-1.5 rounded-lg bg-slate-800 text-xs font-semibold text-slate-300">
+            Hide Guide
+          </button>
+        </div>
+        <div id="advancedChunkBox" class="flex items-center gap-2">
+          <span id="networkModePill" class="text-[11px] font-mono text-slate-400">Turbo 256KB</span>
+          <select id="chunkSizeSelect" onchange="updateChunkSize()" class="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs font-mono text-slate-200">
+            <option value="65536">64 KB</option>
+            <option value="262144" selected>256 KB (Max Speed)</option>
+            <option value="524288">512 KB (LAN Turbo)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Quick Text Snippet & Test Payloads -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="space-y-2">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Quick Terminal Commands</span>
-            <button type="button" onclick="copyTextById('gitDeployCommands', 'Git deployment commands copied')" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-sky-300 font-medium transition">
-              Copy Commands
-            </button>
+            <span class="text-xs font-semibold text-slate-300">Send Text / Clipboard Snippet</span>
+            <button type="button" onclick="sendTextSnippet()" class="px-3 py-1 rounded-lg bg-rose-500 text-white text-xs font-semibold">Send Snippet</button>
           </div>
-          <pre id="gitDeployCommands" class="font-mono text-xs text-slate-300 overflow-x-auto leading-relaxed">git init
+          <textarea id="snippetInput" rows="2" placeholder="Paste link or text..." class="w-full rounded-xl bg-slate-950 border border-slate-800 p-2.5 text-xs font-mono text-slate-200"></textarea>
+          <div class="text-xs text-slate-400">Received Snippets (<span id="snippetCount">0</span>)</div>
+          <div id="receivedSnippetList" class="space-y-1 max-h-24 overflow-y-auto"></div>
+        </div>
+
+        <div class="space-y-2">
+          <div id="advancedSampleBar" class="flex flex-wrap items-center gap-2">
+            <button type="button" onclick="addSampleTestFile('firmware')" class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 text-xs">+ Sample Firmware (.bin)</button>
+            <button type="button" onclick="addSampleTestFile('config')" class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 text-xs">+ Sample Telemetry (.json)</button>
+            <button type="button" onclick="clearTransferLog()" class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 text-xs">Clear</button>
+          </div>
+          <div id="advancedLogCard">
+            <div id="transferLog" class="font-mono text-[11px] text-slate-400 bg-slate-950 border border-slate-800 rounded-xl p-2.5 h-28 overflow-y-auto space-y-1"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="quickGuideBanner" class="hidden"><div id="guideStepsGrid"></div></div>
+
+      <!-- GitHub Link Builder Panel -->
+      <div id="tabPanel-links" class="hidden space-y-3 pt-2 border-t border-slate-800">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <input id="ghOwnerInput" type="text" value="tejo899" oninput="updateRepoLinkBuilder()" class="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-100" />
+          <input id="ghRepoInput" type="text" value="Applications" oninput="updateRepoLinkBuilder()" class="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-100" />
+          <input id="ghFilePathInput" type="text" value="releases/app-release.zip" oninput="updateRepoLinkBuilder()" class="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-100" />
+        </div>
+        <div class="flex flex-wrap gap-2 items-center">
+          <span id="ghPagesUrlPreview" class="font-mono text-xs text-slate-300"></span>
+          <button type="button" onclick="copyTextById('ghPagesUrlPreview', 'Copied Pages URL')" class="px-2.5 py-1 rounded bg-slate-800 text-xs">Copy Pages Download URL</button>
+          <span id="ghRawUrlPreview" class="font-mono text-xs text-slate-300"></span>
+          <button type="button" onclick="copyTextById('ghRawUrlPreview', 'Copied Raw URL')" class="px-2.5 py-1 rounded bg-slate-800 text-xs">Copy Raw File URL</button>
+        </div>
+      </div>
+
+      <!-- GitHub Deploy Panel -->
+      <div id="tabPanel-deploy" class="hidden space-y-2 pt-2 border-t border-slate-800">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-300">Git Commands (tejo899/Applications - FTP branch)</span>
+          <button type="button" onclick="copyTextById('gitDeployCommands', 'Copied Git commands')" class="px-2.5 py-1 rounded bg-slate-800 text-xs">Copy Commands</button>
+        </div>
+        <pre id="gitDeployCommands" class="font-mono text-xs text-slate-300 bg-slate-950 p-3 rounded-xl overflow-x-auto">git init
 git add index.html
-git commit -m "Deploy GitDrop P2P file transfer web app"
+git commit -m "Update SendDirect P2P web app"
 git branch -M FTP
 git remote add origin https://github.com/tejo899/Applications.git
 git push -u origin FTP</pre>
-        </div>
       </div>
     </section>
 
@@ -527,10 +377,11 @@ git push -u origin FTP</pre>
       activeConn: null,
       simpleUi: true,
       guideVisible: true,
-      loopbackMode: true,
-      autoDownload: false,
+      loopbackMode: false,
+      autoDownload: true,
       wakeLock: null,
-      chunkSize: 65536,
+      pickerLocked: false,
+      chunkSize: 262144, // 256 KB default for high-throughput streaming
       outgoingQueue: [],
       receivedFiles: [],
       receivedSnippets: [],
@@ -544,7 +395,6 @@ git push -u origin FTP</pre>
 
     const PEER_PREFIX = 'gitdrop-p2p-v1-';
 
-    // --- Utility Functions ---
     function formatBytes(bytes) {
       if (!bytes || bytes <= 0) return '0 B';
       const units = ['B', 'KB', 'MB', 'GB'];
@@ -554,7 +404,7 @@ git push -u origin FTP</pre>
     }
 
     function generateRoomCode() {
-      const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+      const chars = '0123456789';
       let code = '';
       for (let i = 0; i < 6; i++) {
         code += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -566,25 +416,24 @@ git push -u origin FTP</pre>
       const container = document.getElementById('toastContainer');
       if (!container) return;
       const colors = {
-        info: 'border-sky-500/40 bg-slate-900/95 text-sky-200',
+        info: 'border-rose-500/40 bg-slate-900/95 text-rose-200',
         success: 'border-emerald-500/40 bg-slate-900/95 text-emerald-200',
         warn: 'border-amber-500/40 bg-slate-900/95 text-amber-200'
       };
       const el = document.createElement('div');
-      el.className = `pointer-events-auto border rounded-xl px-4 py-2.5 text-xs font-medium shadow-xl transition-all duration-200 ${colors[type] || colors.info}`;
+      el.className = `pointer-events-auto border rounded-xl px-4 py-2.5 text-xs font-semibold shadow-xl transition-all duration-200 ${colors[type] || colors.info}`;
       el.textContent = message;
       container.appendChild(el);
       setTimeout(() => {
         el.style.opacity = '0';
-        setTimeout(() => el.remove(), 220);
-      }, 3000);
+        setTimeout(() => el.remove(), 200);
+      }, 2800);
     }
 
     function appendLog(msg) {
       const logEl = document.getElementById('transferLog');
       if (!logEl) return;
-      const now = new Date();
-      const ts = now.toTimeString().split(' ')[0];
+      const ts = new Date().toTimeString().split(' ')[0];
       const line = document.createElement('div');
       line.innerHTML = `<span class="text-slate-500">[${ts}]</span> ${msg}`;
       logEl.appendChild(line);
@@ -594,13 +443,12 @@ git push -u origin FTP</pre>
     function clearTransferLog() {
       const logEl = document.getElementById('transferLog');
       if (logEl) logEl.innerHTML = '';
-      appendLog('Log cleared.');
     }
 
     function copyTextToClipboard(text, successMsg) {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(() => {
-          showToast(successMsg || 'Copied to clipboard!', 'success');
+          showToast(successMsg || 'Copied!', 'success');
         }).catch(() => fallbackCopy(text, successMsg));
       } else {
         fallbackCopy(text, successMsg);
@@ -616,9 +464,9 @@ git push -u origin FTP</pre>
       ta.select();
       try {
         document.execCommand('copy');
-        showToast(successMsg || 'Copied to clipboard!', 'success');
+        showToast(successMsg || 'Copied!', 'success');
       } catch (err) {
-        showToast('Copy failed — please copy manually.', 'warn');
+        showToast('Please copy manually.', 'warn');
       }
       document.body.removeChild(ta);
     }
@@ -634,31 +482,81 @@ git push -u origin FTP</pre>
     }
 
     function copyPairingCode() {
-      copyTextToClipboard(state.myCode, `Pairing code ${state.myCode} copied!`);
+      copyTextToClipboard(state.myCode, `6-digit key ${state.myCode} copied!`);
     }
 
     function copyShareLink() {
-      copyTextToClipboard(getShareablePairingUrl(), 'Auto-pairing link copied!');
+      copyTextToClipboard(getShareablePairingUrl(), 'Pairing link copied!');
     }
 
-    // --- Tab Navigation ---
+    async function shareOrCopyPairingLink() {
+      const url = getShareablePairingUrl();
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: 'SendDirect File Transfer',
+            text: `Connect with my 6-digit key: ${state.myCode}`,
+            url
+          });
+          return;
+        } catch (err) {}
+      }
+      copyShareLink();
+    }
+
+    // --- Crash-Safe Mobile File Picker Triggers ---
+    function stopBubble(event) {
+      if (event) event.stopPropagation();
+    }
+
+    function openNativeFilePicker(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      if (state.pickerLocked) return;
+      state.pickerLocked = true;
+      setTimeout(() => { state.pickerLocked = false; }, 600);
+      const input = document.getElementById('fileInput');
+      if (input) input.click();
+    }
+
+    function triggerFileInput() {
+      openNativeFilePicker();
+    }
+
+    function triggerMediaInput() {
+      const input = document.getElementById('mediaInput');
+      if (input) input.click();
+    }
+
+    function triggerCameraInput() {
+      const input = document.getElementById('cameraInput');
+      if (input) input.click();
+    }
+
+    // --- UI Toggles ---
     function switchTab(tabName) {
-      ['transfer', 'links', 'deploy'].forEach((name) => {
+      ['links', 'deploy'].forEach((name) => {
         const panel = document.getElementById(`tabPanel-${name}`);
-        const btn = document.getElementById(`tabBtn-${name}`);
-        if (panel && btn) {
-          if (name === tabName) {
-            panel.classList.remove('hidden');
-            btn.className = 'px-4 py-2 text-xs sm:text-sm font-medium border-b-2 border-sky-400 text-sky-400 whitespace-nowrap transition';
-          } else {
-            panel.classList.add('hidden');
-            btn.className = 'px-4 py-2 text-xs sm:text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 whitespace-nowrap transition';
-          }
-        }
+        if (panel) panel.classList.toggle('hidden', name !== tabName);
       });
     }
 
-    // --- QR Code Modal ---
+    function toggleGuideBanner() {
+      state.guideVisible = !state.guideVisible;
+      const banner = document.getElementById('quickGuideBanner');
+      if (banner) banner.classList.toggle('hidden', !state.guideVisible);
+    }
+
+    function toggleSimpleUiMode() {
+      state.simpleUi = !state.simpleUi;
+      const extra = document.getElementById('extraToolsSection');
+      const label = document.getElementById('simpleUiBtnLabel');
+      if (extra) extra.classList.toggle('hidden', state.simpleUi);
+      if (label) label.textContent = state.simpleUi ? 'Tools' : 'Hide Tools';
+    }
+
     function renderQrCode() {
       const canvas = document.getElementById('qrCanvas');
       const codeDisplay = document.getElementById('modalRoomCodeDisplay');
@@ -689,21 +587,44 @@ git push -u origin FTP</pre>
       }
     }
 
-    // --- PeerJS & Loopback Initialization ---
-    function updateConnectionUI(statusText, dotClass, peerSummary) {
+    async function toggleWakeLock() {
+      const label = document.getElementById('wakeLockLabel');
+      if (state.wakeLock) {
+        try { await state.wakeLock.release(); } catch (e) {}
+        state.wakeLock = null;
+        if (label) label.textContent = 'Keep Awake: OFF';
+        showToast('Wake Lock off', 'info');
+        return;
+      }
+      if ('wakeLock' in navigator) {
+        try {
+          state.wakeLock = await navigator.wakeLock.request('screen');
+          if (label) label.textContent = 'Keep Awake: ON';
+          showToast('Screen will stay awake during transfers!', 'success');
+        } catch (err) {
+          showToast('Keep browser tab in foreground during transfer.', 'info');
+        }
+      }
+    }
+
+    // --- WebRTC PeerJS Connection (Bidirectional) ---
+    function updateConnectionUI(statusText, dotClass, peerSummary, isConnected) {
       const textEl = document.getElementById('connectionStatusText');
       const dotEl = document.getElementById('connectionDot');
       const badgeEl = document.getElementById('peerCountBadge');
+      const stepPill = document.getElementById('step1StatusPill');
       const disconnectBtn = document.getElementById('disconnectPeerBtn');
       if (textEl) textEl.textContent = statusText;
       if (dotEl) dotEl.className = `w-2 h-2 rounded-full ${dotClass}`;
       if (badgeEl) badgeEl.textContent = peerSummary;
+      if (stepPill) {
+        stepPill.textContent = isConnected ? 'CONNECTED — READY TO SEND & RECEIVE' : '1. CONNECT DEVICES';
+        stepPill.className = isConnected
+          ? 'px-2.5 py-1 rounded-full bg-emerald-500 text-slate-950 font-bold text-xs'
+          : 'px-2.5 py-1 rounded-full bg-rose-500 text-white font-bold text-xs';
+      }
       if (disconnectBtn) {
-        if (state.activeConn && state.activeConn.open) {
-          disconnectBtn.classList.remove('hidden');
-        } else {
-          disconnectBtn.classList.add('hidden');
-        }
+        disconnectBtn.classList.toggle('hidden', !isConnected);
       }
     }
 
@@ -718,8 +639,7 @@ git push -u origin FTP</pre>
       }
 
       if (typeof Peer === 'undefined') {
-        appendLog('PeerJS CDN unavailable; running in Local Loopback Mode.');
-        updateConnectionUI('Loopback Ready', 'bg-emerald-400', 'Local Loopback Active');
+        updateConnectionUI('Offline / Loopback', 'bg-amber-400', 'Enable Loopback Test to test locally', false);
         return;
       }
 
@@ -731,33 +651,31 @@ git push -u origin FTP</pre>
             iceServers: [
               { urls: 'stun:stun.l.google.com:19302' },
               { urls: 'stun:stun1.l.google.com:19302' },
-              { urls: 'stun:stun2.l.google.com:19302' }
+              { urls: 'stun:stun2.l.google.com:19302' },
+              { urls: 'stun:stun3.l.google.com:19302' }
             ]
           }
         });
         state.peer = peer;
 
         peer.on('open', () => {
-          appendLog(`WebRTC signaling ready with code <span class="text-sky-400 font-semibold">${state.myCode}</span>.`);
-          if (state.loopbackMode && (!state.activeConn || !state.activeConn.open)) {
-            updateConnectionUI('P2P + Loopback Ready', 'bg-emerald-400', 'Loopback + WebRTC Ready');
-          } else {
-            updateConnectionUI('Awaiting Peer...', 'bg-sky-400', 'Signaling Online');
-          }
+          appendLog(`Ready with 6-digit key ${state.myCode}`);
+          updateConnectionUI('Ready to Pair', 'bg-sky-400', 'Waiting for 6-digit key connection...', false);
           checkUrlAutoConnect();
         });
 
         peer.on('connection', (conn) => {
-          setupDataConnection(conn, 'Incoming peer');
+          setupDataConnection(conn, 'Incoming device');
         });
 
         peer.on('error', (err) => {
-          appendLog(`WebRTC notice (${err.type || 'network'}): Loopback mode remains active.`);
-          updateConnectionUI('Loopback Ready', 'bg-emerald-400', 'Virtual Receiver Ready');
+          appendLog(`Notice: ${err.type || 'signaling'}`);
+          if (err.type === 'peer-unavailable') {
+            showToast('6-digit key not found — check the key on the other device.', 'warn');
+          }
         });
       } catch (err) {
-        appendLog('Initialized local loopback transfer channel.');
-        updateConnectionUI('Loopback Ready', 'bg-emerald-400', 'Virtual Receiver Ready');
+        updateConnectionUI('Loopback Ready', 'bg-amber-400', 'Local mode', false);
       }
     }
 
@@ -765,12 +683,18 @@ git push -u origin FTP</pre>
       state.activeConn = conn;
       const markConnected = () => {
         const remoteShort = (conn.peer || '').replace(PEER_PREFIX, '') || 'PEER';
-        // Automatically turn off local loopback once a real remote peer connects
         state.loopbackMode = false;
         syncLoopbackUI();
-        appendLog(`${label} connected (<span class="text-emerald-400">${remoteShort}</span>).`);
-        showToast(`Connected to device ${remoteShort}!`, 'success');
-        updateConnectionUI(`Connected (${remoteShort})`, 'bg-emerald-400', `Paired with ${remoteShort}`);
+        // Configure high-throughput WebRTC buffer threshold if underlying channel is exposed
+        if (conn.dataChannel) {
+          try {
+            conn.dataChannel.binaryType = 'arraybuffer';
+            conn.dataChannel.bufferedAmountLowThreshold = 1048576; // 1 MB low water mark
+          } catch (e) {}
+        }
+        appendLog(`${label} linked (${remoteShort})`);
+        showToast(`Connected with device ${remoteShort}! Either device can now send files.`, 'success');
+        updateConnectionUI(`Connected (${remoteShort})`, 'bg-emerald-400', `Linked with key ${remoteShort} — Both devices can send files`, true);
         try {
           conn.send({ kind: 'peer-hello', code: state.myCode });
         } catch (e) {}
@@ -786,19 +710,10 @@ git push -u origin FTP</pre>
         handleIncomingPayload(payload);
       });
 
-      conn.on('error', (err) => {
-        appendLog(`Connection error: ${err.message || err}`);
-        showToast('Peer connection interrupted — check code and retry.', 'warn');
-      });
-
       conn.on('close', () => {
-        appendLog('Remote peer disconnected.');
         state.activeConn = null;
-        updateConnectionUI(
-          state.loopbackMode ? 'P2P + Loopback Ready' : 'Awaiting Peer...',
-          'bg-sky-400',
-          state.loopbackMode ? 'Loopback Ready' : 'No active peer'
-        );
+        showToast('Device disconnected.', 'info');
+        updateConnectionUI('Ready to Pair', 'bg-sky-400', 'Connection closed', false);
       });
     }
 
@@ -806,23 +721,27 @@ git push -u origin FTP</pre>
       const input = document.getElementById('remoteCodeInput');
       const raw = (input ? input.value : '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
       if (!raw || raw.length < 4) {
-        showToast('Enter a valid 6-character pairing code.', 'warn');
+        showToast('Please enter the 6-digit key from the other device.', 'warn');
         return;
       }
       if (raw === state.myCode) {
         state.loopbackMode = true;
         syncLoopbackUI();
-        showToast('Paired with local loopback receiver on this page!', 'success');
-        appendLog('Connected to local loopback receiver.');
+        updateConnectionUI('Loopback Connected', 'bg-emerald-400', 'Self-test mode active on this device', true);
+        showToast('Connected in Loopback Test mode!', 'success');
         return;
       }
       if (!state.peer || state.peer.destroyed) {
-        showToast('WebRTC signaling unavailable here — using Local Loopback mode.', 'info');
+        showToast('Reconnecting signaling server...', 'info');
+        initPeerSession(state.myCode);
         return;
       }
-      appendLog(`Dialing remote peer <span class="text-sky-400">${raw}</span>...`);
-      const conn = state.peer.connect(PEER_PREFIX + raw, { reliable: true });
-      setupDataConnection(conn, 'Outbound peer');
+      showToast(`Connecting to ${raw}...`, 'info');
+      const conn = state.peer.connect(PEER_PREFIX + raw, {
+        reliable: true,
+        serialization: 'binary'
+      });
+      setupDataConnection(conn, 'Remote device');
     }
 
     function disconnectPeers() {
@@ -830,159 +749,57 @@ git push -u origin FTP</pre>
         try { state.activeConn.close(); } catch (e) {}
         state.activeConn = null;
       }
-      showToast('Disconnected from remote peer.', 'info');
-      updateConnectionUI(
-        state.loopbackMode ? 'P2P + Loopback Ready' : 'Awaiting Peer...',
-        'bg-sky-400',
-        state.loopbackMode ? 'Loopback Ready' : 'Disconnected'
-      );
+      state.loopbackMode = false;
+      syncLoopbackUI();
+      updateConnectionUI('Ready to Pair', 'bg-sky-400', 'Disconnected', false);
     }
 
     function regeneratePairingCode() {
       initPeerSession(generateRoomCode());
-      showToast(`New pairing code: ${state.myCode}`, 'info');
+      showToast(`New 6-digit key: ${state.myCode}`, 'info');
     }
 
     function toggleLoopbackMode() {
       state.loopbackMode = !state.loopbackMode;
       syncLoopbackUI();
-      showToast(
-        state.loopbackMode
-          ? 'Loopback Test Mode ON: transfers will also arrive in the Receive panel on this page.'
-          : 'Loopback Test Mode OFF: transfers will only go to remote WebRTC peers.',
-        'info'
-      );
-    }
-
-    function toggleGuideBanner() {
-      state.guideVisible = !state.guideVisible;
-      const grid = document.getElementById('guideStepsGrid');
-      const btn = document.getElementById('toggleGuideBtn');
-      if (grid) grid.classList.toggle('hidden', !state.guideVisible);
-      if (btn) btn.textContent = state.guideVisible ? 'Hide Guide' : 'Show Guide';
-    }
-
-    function toggleSimpleUiMode() {
-      state.simpleUi = !state.simpleUi;
-      const label = document.getElementById('simpleUiBtnLabel');
-      const btn = document.getElementById('simpleUiToggleBtn');
-      const chunkBox = document.getElementById('advancedChunkBox');
-      const sampleBar = document.getElementById('advancedSampleBar');
-      const logCard = document.getElementById('advancedLogCard');
-
-      if (label) label.textContent = state.simpleUi ? 'Simple UI: ON' : 'Simple UI: OFF (Pro)';
-      if (btn) {
-        btn.className = state.simpleUi
-          ? 'px-3 py-1.5 rounded-xl border border-sky-500/40 bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 text-xs font-semibold transition flex items-center gap-1.5'
-          : 'px-3 py-1.5 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-800 text-slate-300 text-xs font-semibold transition flex items-center gap-1.5';
+      if (state.loopbackMode) {
+        updateConnectionUI('Loopback Connected', 'bg-emerald-400', 'Test mode: files sent here arrive in Receive box', true);
+        showToast('Loopback Test ON: you can test sending files right on this screen.', 'success');
+      } else if (!state.activeConn || !state.activeConn.open) {
+        updateConnectionUI('Ready to Pair', 'bg-sky-400', 'Enter 6-digit key to connect', false);
       }
-      if (chunkBox) {
-        chunkBox.classList.toggle('hidden', state.simpleUi);
-        chunkBox.classList.toggle('flex', !state.simpleUi);
-      }
-      if (sampleBar) {
-        sampleBar.classList.toggle('hidden', state.simpleUi);
-        sampleBar.classList.toggle('flex', !state.simpleUi);
-      }
-      if (logCard) {
-        logCard.classList.toggle('hidden', state.simpleUi);
-      }
-      showToast(state.simpleUi ? 'Switched to clean Simple 1-2-3 UI' : 'Showing Advanced Controls & WebRTC Log', 'info');
     }
 
     function syncLoopbackUI() {
-      const btn = document.getElementById('loopbackToggleBtn');
       const label = document.getElementById('loopbackBtnLabel');
-      const pill = document.getElementById('networkModePill');
       if (label) label.textContent = state.loopbackMode ? 'Loopback Test: ON' : 'Loopback Test: OFF';
-      if (pill) pill.textContent = state.loopbackMode ? 'Loopback + P2P' : 'Live P2P Only';
-      if (btn) {
-        btn.className = state.loopbackMode
-          ? 'px-3 py-1.5 rounded-xl border border-indigo-500/40 bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 text-xs font-medium transition flex items-center gap-1.5'
-          : 'px-3 py-1.5 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-800 text-slate-400 text-xs font-medium transition flex items-center gap-1.5';
-      }
     }
 
     function checkUrlAutoConnect() {
       const params = new URLSearchParams(window.location.search);
       const peerParam = params.get('peer');
-      if (peerParam && peerParam.toUpperCase() !== state.myCode) {
+      if (peerParam && peerParam.trim().toUpperCase() !== state.myCode) {
         const input = document.getElementById('remoteCodeInput');
-        if (input) input.value = peerParam.toUpperCase();
+        if (input) input.value = peerParam.trim().toUpperCase();
         connectToRemotePeer();
       }
     }
 
-    // --- File Selection, Mobile Pickers & Wake Lock ---
-    function triggerFileInput() {
-      const input = document.getElementById('fileInput');
-      if (input) input.click();
-    }
-
-    function triggerMediaInput() {
-      const input = document.getElementById('mediaInput');
-      if (input) input.click();
-    }
-
-    function triggerCameraInput() {
-      const input = document.getElementById('cameraInput');
-      if (input) input.click();
-    }
-
-    async function shareOrCopyPairingLink() {
-      const url = getShareablePairingUrl();
-      if (navigator.share) {
-        try {
-          await navigator.share({
-            title: 'GitDrop P2P File Transfer',
-            text: `Connect to my device on GitDrop (Code: ${state.myCode})`,
-            url
-          });
-          showToast('Shared pairing link!', 'success');
-          return;
-        } catch (err) {
-          // User cancelled or share unsupported in context; fall back to copy
-        }
-      }
-      copyShareLink();
-    }
-
-    async function toggleWakeLock() {
-      const label = document.getElementById('wakeLockLabel');
-      const btn = document.getElementById('wakeLockBtn');
-      if (state.wakeLock) {
-        try { await state.wakeLock.release(); } catch (e) {}
-        state.wakeLock = null;
-        if (label) label.textContent = 'Keep Awake: OFF';
-        if (btn) btn.className = 'px-3 py-1.5 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-800 text-slate-300 text-xs font-medium transition flex items-center gap-1.5';
-        showToast('Screen Wake Lock released.', 'info');
-        return;
-      }
-      if ('wakeLock' in navigator) {
-        try {
-          state.wakeLock = await navigator.wakeLock.request('screen');
-          if (label) label.textContent = 'Keep Awake: ON';
-          if (btn) btn.className = 'px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-500/15 text-amber-300 text-xs font-medium transition flex items-center gap-1.5';
-          showToast('Mobile screen will stay awake during transfers.', 'success');
-          return;
-        } catch (err) {
-          showToast('Wake Lock not permitted in this tab mode; kept active via UI timer.', 'info');
-        }
-      } else {
-        showToast('Wake Lock API not supported on this browser.', 'info');
-      }
-    }
-
+    // --- File Selection (Zero-Copy Queueing so Mobile Never Crashes on Large Files) ---
     function handleFileSelect(event) {
-      const files = event.target.files;
-      if (files && files.length > 0) {
-        queueFiles(Array.from(files));
-        event.target.value = '';
-      }
+      const target = event.target;
+      if (!target || !target.files || target.files.length === 0) return;
+      const selected = Array.from(target.files);
+      queueFiles(selected);
+      // Reset input value safely after queuing
+      setTimeout(() => {
+        try { target.value = ''; } catch (e) {}
+      }, 50);
     }
 
     function queueFiles(fileArray) {
-      fileArray.forEach((file) => {
+      for (let i = 0; i < fileArray.length; i++) {
+        const file = fileArray[i];
         const id = 'file-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
         state.outgoingQueue.push({
           id,
@@ -991,37 +808,24 @@ git push -u origin FTP</pre>
           size: file.size,
           type: file.type || 'application/octet-stream',
           progress: 0,
-          status: 'Queued'
+          status: 'Ready'
         });
-      });
-      appendLog(`Added ${fileArray.length} file(s) to outgoing queue.`);
+      }
       renderOutgoingQueue();
+      showToast(`Added ${fileArray.length} file(s)`, 'info');
     }
 
     function addSampleTestFile(kind) {
       let file;
       if (kind === 'firmware') {
-        const bytes = new Uint8Array(131072);
-        for (let i = 0; i < bytes.length; i++) bytes[i] = (i * 31) & 0xff;
-        const header = new TextEncoder().encode('SAFEPANI-FW-V2.4-NRF52840-BUILD-20261113\n');
-        bytes.set(header, 0);
-        file = new File([bytes], 'safepaani_fw_v2.4.0.bin', { type: 'application/octet-stream' });
+        const bytes = new Uint8Array(1048576); // 1 MB high-speed test payload
+        for (let i = 0; i < bytes.length; i += 64) bytes[i] = i & 0xff;
+        file = new File([bytes], 'safepaani_firmware_1MB.bin', { type: 'application/octet-stream' });
       } else {
-        const payload = {
-          device: 'SafePaani-Optical-Node-04',
-          timestamp: new Date().toISOString(),
-          protocol: 'Modbus-RTU-RS485',
-          readings: [
-            { sampleId: 'S-101', wavelengthNm: 525, residualChlorinePpm: 1.48, batteryMv: 3980 },
-            { sampleId: 'S-102', wavelengthNm: 525, residualChlorinePpm: 2.05, batteryMv: 3972 },
-            { sampleId: 'S-103', wavelengthNm: 525, residualChlorinePpm: 0.85, batteryMv: 3965 }
-          ]
-        };
-        const text = JSON.stringify(payload, null, 2);
-        file = new File([text], 'telemetry_calibration_log.json', { type: 'application/json' });
+        const text = JSON.stringify({ device: 'SafePaani', status: 'OK', timestamp: Date.now() }, null, 2);
+        file = new File([text], 'telemetry_sample.json', { type: 'application/json' });
       }
       queueFiles([file]);
-      showToast(`Added ${file.name} (${formatBytes(file.size)})`, 'info');
     }
 
     function removeOutgoingItem(id) {
@@ -1032,15 +836,11 @@ git push -u origin FTP</pre>
     function clearOutgoingQueue() {
       state.outgoingQueue = [];
       renderOutgoingQueue();
-      showToast('Outgoing queue cleared.', 'info');
     }
 
     function updateChunkSize() {
       const sel = document.getElementById('chunkSizeSelect');
-      if (sel) {
-        state.chunkSize = parseInt(sel.value, 10) || 65536;
-        appendLog(`Chunk size set to ${formatBytes(state.chunkSize)}.`);
-      }
+      if (sel) state.chunkSize = parseInt(sel.value, 10) || 262144;
     }
 
     function renderOutgoingQueue() {
@@ -1051,55 +851,60 @@ git push -u origin FTP</pre>
 
       const totalBytes = state.outgoingQueue.reduce((acc, item) => acc + item.size, 0);
       if (countEl) countEl.textContent = String(state.outgoingQueue.length);
-      if (totalEl) totalEl.textContent = formatBytes(totalBytes);
+      if (totalEl) totalEl.innerHTML = `${formatBytes(totalBytes)} (<span id="outgoingCount">${state.outgoingQueue.length}</span>)`;
 
       if (state.outgoingQueue.length === 0) {
-        listEl.innerHTML = `
-          <div class="text-center py-6 border border-slate-800/60 rounded-xl bg-slate-950/30 text-xs text-slate-500">
-            No files queued yet. Drop files above or add a sample payload to test.
-          </div>`;
+        listEl.innerHTML = `<div class="text-center py-4 text-xs text-slate-500">No files selected yet. Tap + above to pick files.</div>`;
         return;
       }
 
-      listEl.innerHTML = state.outgoingQueue.map((item) => {
-        const badgeColor = item.status === 'Completed'
-          ? 'text-emerald-400 bg-emerald-500/15'
-          : item.status === 'Sending'
-          ? 'text-sky-400 bg-sky-500/15'
-          : 'text-slate-300 bg-slate-800';
-        return `
-          <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3 space-y-2">
-            <div class="flex items-center justify-between gap-2">
-              <div class="min-w-0">
-                <div class="text-xs font-medium text-slate-100 truncate">${escapeHtml(item.name)}</div>
-                <div class="text-[11px] font-mono text-slate-400">${formatBytes(item.size)} &bull; ${Math.max(1, Math.ceil(item.size / state.chunkSize))} chunks</div>
-              </div>
-              <div class="flex items-center gap-2 shrink-0">
-                <span class="text-[11px] font-mono px-2 py-0.5 rounded ${badgeColor}">${item.status} ${item.progress > 0 && item.progress < 100 ? item.progress + '%' : ''}</span>
-                <button type="button" onclick="removeOutgoingItem('${item.id}')" class="p-1 text-slate-500 hover:text-rose-400 transition" title="Remove">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
-              </div>
+      listEl.innerHTML = state.outgoingQueue.map((item) => `
+        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3 space-y-2">
+          <div class="flex items-center justify-between gap-2">
+            <div class="min-w-0">
+              <div class="text-xs font-semibold text-white truncate">${escapeHtml(item.name)}</div>
+              <div class="text-[11px] font-mono text-slate-400">${formatBytes(item.size)}</div>
             </div>
-            <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-              <div class="h-full bg-gradient-to-r from-sky-400 to-emerald-400 transition-all duration-150" style="width: ${item.progress}%"></div>
+            <div class="flex items-center gap-2 shrink-0">
+              <span id="status-${item.id}" class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-rose-300">${item.status}</span>
+              <button type="button" onclick="removeOutgoingItem('${item.id}')" class="p-1 text-slate-500 hover:text-rose-400">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
             </div>
           </div>
-        `;
-      }).join('');
+          <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+            <div id="prog-${item.id}" class="h-full bg-gradient-to-r from-rose-500 to-orange-400 transition-all duration-75" style="width: ${item.progress}%"></div>
+          </div>
+        </div>
+      `).join('');
     }
 
-    // --- Chunked File Transfer Pipeline ---
+    // --- High-Throughput Unthrottled Streaming Engine ---
+    async function waitForBufferDrain(dc) {
+      if (!dc || dc.bufferedAmount <= 8388608) return; // Allow up to 8 MB in flight
+      return new Promise((resolve) => {
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          dc.removeEventListener('bufferedamountlow', finish);
+          resolve();
+        };
+        dc.addEventListener('bufferedamountlow', finish);
+        setTimeout(finish, 25);
+      });
+    }
+
     async function sendQueuedFiles() {
-      const pending = state.outgoingQueue.filter((item) => item.status !== 'Completed');
+      const pending = state.outgoingQueue.filter((item) => item.status !== 'Sent');
       if (pending.length === 0) {
-        showToast('Queue is empty or all files are already sent! Add a file first.', 'warn');
+        showToast('Please tap + to add files first!', 'warn');
         return;
       }
 
       const hasRemote = state.activeConn && state.activeConn.open;
       if (!hasRemote && !state.loopbackMode) {
-        showToast('Connect to a remote peer or enable Loopback Test Mode first.', 'warn');
+        showToast('Connect to the other device using the 6-digit key first (or tap Loopback Test).', 'warn');
         return;
       }
 
@@ -1109,58 +914,70 @@ git push -u origin FTP</pre>
     }
 
     async function transmitSingleFile(item) {
-      item.status = 'Sending';
+      item.status = 'Sending...';
       item.progress = 0;
-      renderOutgoingQueue();
+      const statusEl = document.getElementById(`status-${item.id}`);
+      const progEl = document.getElementById(`prog-${item.id}`);
+      if (statusEl) statusEl.textContent = '0%';
 
       const totalSize = item.file.size;
-      if (totalSize > 500 * 1024 * 1024) {
-        appendLog(`<span class="text-amber-300">Large file notice:</span> ${escapeHtml(item.name)} exceeds 500 MB; mobile receivers may experience browser RAM limits.`);
-      }
-      const chunkSize = state.chunkSize;
+      const chunkSize = state.chunkSize; // 256 KB chunks
+      const windowSize = 4 * 1024 * 1024; // Read 4 MB windows from disk to minimize I/O overhead
       const totalChunks = Math.max(1, Math.ceil(totalSize / chunkSize));
       const startTime = performance.now();
+      let lastUiTick = startTime;
 
-      const metaPacket = {
+      dispatchPacket({
         kind: 'file-start',
         transferId: item.id,
         name: item.name,
         size: totalSize,
         mimeType: item.type,
         totalChunks
-      };
-      dispatchPacket(metaPacket);
+      });
 
-      for (let idx = 0; idx < totalChunks; idx++) {
-        const start = idx * chunkSize;
-        const end = Math.min(start + chunkSize, totalSize);
-        // Slice on-demand so large files don't exhaust mobile RAM on the sender
-        const slice = await item.file.slice(start, end).arrayBuffer();
+      let chunkIndex = 0;
+      const dc = state.activeConn ? state.activeConn.dataChannel : null;
 
-        // Backpressure guard for live WebRTC DataChannel
-        if (state.activeConn && state.activeConn.dataChannel && state.activeConn.dataChannel.bufferedAmount > 4 * 1024 * 1024) {
-          while (state.activeConn && state.activeConn.dataChannel && state.activeConn.dataChannel.bufferedAmount > 1024 * 1024) {
-            await new Promise((r) => setTimeout(r, 15));
+      for (let winOffset = 0; winOffset < totalSize; winOffset += windowSize) {
+        const winEnd = Math.min(winOffset + windowSize, totalSize);
+        const windowBuffer = await item.file.slice(winOffset, winEnd).arrayBuffer();
+
+        for (let localOffset = 0; localOffset < windowBuffer.byteLength; localOffset += chunkSize) {
+          const sliceEnd = Math.min(localOffset + chunkSize, windowBuffer.byteLength);
+          const chunkBuffer = windowBuffer.slice(localOffset, sliceEnd);
+
+          if (dc && dc.bufferedAmount > 8388608) {
+            await waitForBufferDrain(dc);
           }
-        }
 
-        dispatchPacket({
-          kind: 'file-chunk',
-          transferId: item.id,
-          index: idx,
-          data: slice
-        });
+          dispatchPacket({
+            kind: 'file-chunk',
+            transferId: item.id,
+            index: chunkIndex,
+            data: chunkBuffer
+          });
 
-        item.progress = Math.round(((idx + 1) / totalChunks) * 100);
-        if (idx % 4 === 0 || idx === totalChunks - 1) {
-          renderOutgoingQueue();
-          await new Promise((r) => setTimeout(r, 6));
+          chunkIndex++;
+          const now = performance.now();
+          if (now - lastUiTick > 80 || chunkIndex === totalChunks) {
+            lastUiTick = now;
+            const pct = Math.round((chunkIndex / totalChunks) * 100);
+            item.progress = pct;
+            if (progEl) progEl.style.width = `${pct}%`;
+            if (statusEl) statusEl.textContent = `${pct}%`;
+            const elapsedSec = Math.max(0.01, (now - startTime) / 1000);
+            const sentBytes = winOffset + sliceEnd;
+            state.stats.lastSpeedMbps = (sentBytes / (1024 * 1024)) / elapsedSec;
+            updateMetricsUI();
+            // Yield microtask briefly every 80ms so mobile UI stays responsive
+            await new Promise((r) => setTimeout(r, 0));
+          }
         }
       }
 
-      const elapsedSec = Math.max(0.05, (performance.now() - startTime) / 1000);
-      const speedMbps = (totalSize / (1024 * 1024)) / elapsedSec;
-      state.stats.lastSpeedMbps = speedMbps;
+      const totalElapsedSec = Math.max(0.005, (performance.now() - startTime) / 1000);
+      state.stats.lastSpeedMbps = (totalSize / (1024 * 1024)) / totalElapsedSec;
 
       dispatchPacket({
         kind: 'file-end',
@@ -1170,10 +987,12 @@ git push -u origin FTP</pre>
         mimeType: item.type
       });
 
-      item.status = 'Completed';
+      item.status = 'Sent';
       item.progress = 100;
-      renderOutgoingQueue();
-      appendLog(`Sent <span class="text-sky-300">${escapeHtml(item.name)}</span> (${formatBytes(totalSize)}) at ${speedMbps.toFixed(1)} MB/s.`);
+      if (progEl) progEl.style.width = '100%';
+      if (statusEl) statusEl.textContent = 'Sent ✓';
+      updateMetricsUI();
+      showToast(`Sent ${item.name} at ${state.stats.lastSpeedMbps.toFixed(1)} MB/s!`, 'success');
     }
 
     function dispatchPacket(packet) {
@@ -1190,19 +1009,17 @@ git push -u origin FTP</pre>
 
       if (payload.kind === 'peer-hello') {
         const remoteCode = payload.code || 'PEER';
-        updateConnectionUI(`Connected (${remoteCode})`, 'bg-emerald-400', `Paired with ${remoteCode}`);
+        updateConnectionUI(`Connected (${remoteCode})`, 'bg-emerald-400', `Linked with key ${remoteCode} — Both devices can send files`, true);
         return;
       }
 
       if (payload.kind === 'text-snippet') {
         state.receivedSnippets.unshift({
           id: 'snip-' + Date.now(),
-          text: payload.text,
-          time: new Date().toLocaleTimeString()
+          text: payload.text
         });
-        appendLog(`Received text snippet (${payload.text.length} chars).`);
         renderReceivedSnippets();
-        showToast('New text snippet received!', 'success');
+        showToast('Received text snippet!', 'success');
         return;
       }
 
@@ -1211,10 +1028,10 @@ git push -u origin FTP</pre>
           name: payload.name,
           size: payload.size,
           mimeType: payload.mimeType || 'application/octet-stream',
-          totalChunks: payload.totalChunks,
           chunks: [],
           receivedBytes: 0,
-          startTime: performance.now()
+          startTime: performance.now(),
+          lastUiTick: performance.now()
         };
         return;
       }
@@ -1227,7 +1044,14 @@ git push -u origin FTP</pre>
         const byteLen = rawChunk ? (rawChunk.byteLength || rawChunk.size || rawChunk.length || 0) : 0;
         entry.receivedBytes += byteLen;
         state.stats.totalBytesTransferred += byteLen;
-        updateMetricsUI();
+
+        const now = performance.now();
+        if (now - entry.lastUiTick > 100) {
+          entry.lastUiTick = now;
+          const elapsed = Math.max(0.01, (now - entry.startTime) / 1000);
+          state.stats.lastSpeedMbps = (entry.receivedBytes / (1024 * 1024)) / elapsed;
+          updateMetricsUI();
+        }
         return;
       }
 
@@ -1236,26 +1060,23 @@ git push -u origin FTP</pre>
         if (!entry) return;
         const blob = new Blob(entry.chunks, { type: entry.mimeType });
         const url = URL.createObjectURL(blob);
-        const elapsedSec = Math.max(0.05, (performance.now() - entry.startTime) / 1000);
-        const speedMbps = (entry.size / (1024 * 1024)) / elapsedSec;
-        state.stats.lastSpeedMbps = speedMbps;
+        const elapsedSec = Math.max(0.005, (performance.now() - entry.startTime) / 1000);
+        state.stats.lastSpeedMbps = (entry.size / (1024 * 1024)) / elapsedSec;
         state.stats.filesCompleted += 1;
 
-        const fileRecord = {
+        state.receivedFiles.unshift({
           id: payload.transferId,
           name: entry.name,
           size: entry.size,
-          mimeType: entry.mimeType,
           blob,
           url,
           time: new Date().toLocaleTimeString()
-        };
-        state.receivedFiles.unshift(fileRecord);
+        });
         delete state.incomingBuffers[payload.transferId];
 
         updateMetricsUI();
         renderReceivedFiles();
-        showToast(`Received ${entry.name} (${formatBytes(entry.size)})`, 'success');
+        showToast(`Received ${entry.name}!`, 'success');
 
         if (state.autoDownload) {
           triggerDownloadUrl(url, entry.name);
@@ -1279,21 +1100,17 @@ git push -u origin FTP</pre>
       if (countEl) countEl.textContent = String(state.receivedFiles.length);
 
       if (state.receivedFiles.length === 0) {
-        listEl.innerHTML = `
-          <div class="text-center py-6 border border-slate-800/60 rounded-xl bg-slate-950/30 text-xs text-slate-500">
-            No files received yet. Click <span class="text-slate-300 font-medium">+ Sample Firmware</span> and <span class="text-sky-400 font-medium">Send Queued Files</span> to test!
-          </div>`;
+        listEl.innerHTML = `<div class="text-center py-6 text-xs text-slate-500">Waiting for incoming files...</div>`;
         return;
       }
 
       listEl.innerHTML = state.receivedFiles.map((item) => `
-        <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3 flex items-center justify-between gap-3">
+        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3 flex items-center justify-between gap-3">
           <div class="min-w-0">
-            <div class="text-xs font-medium text-emerald-300 truncate">${escapeHtml(item.name)}</div>
-            <div class="text-[11px] font-mono text-slate-400">${formatBytes(item.size)} &bull; Received at ${item.time}</div>
+            <div class="text-xs font-semibold text-emerald-300 truncate">${escapeHtml(item.name)}</div>
+            <div class="text-[11px] font-mono text-slate-400">${formatBytes(item.size)} &bull; ${item.time}</div>
           </div>
-          <button type="button" onclick="downloadReceivedFile('${item.id}')" class="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs shrink-0 transition flex items-center gap-1">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          <button type="button" onclick="downloadReceivedFile('${item.id}')" class="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shrink-0 transition">
             Save
           </button>
         </div>
@@ -1302,8 +1119,7 @@ git push -u origin FTP</pre>
 
     function downloadReceivedFile(id) {
       const item = state.receivedFiles.find((f) => f.id === id);
-      if (!item) return;
-      triggerDownloadUrl(item.url, item.name);
+      if (item) triggerDownloadUrl(item.url, item.name);
     }
 
     function triggerDownloadUrl(url, filename) {
@@ -1317,7 +1133,7 @@ git push -u origin FTP</pre>
 
     async function downloadAllReceivedAsZip() {
       if (state.receivedFiles.length === 0) {
-        showToast('No received files to bundle yet.', 'warn');
+        showToast('No received files yet.', 'warn');
         return;
       }
       if (typeof JSZip === 'undefined') {
@@ -1325,13 +1141,9 @@ git push -u origin FTP</pre>
         return;
       }
       const zip = new JSZip();
-      state.receivedFiles.forEach((f) => {
-        zip.file(f.name, f.blob);
-      });
+      state.receivedFiles.forEach((f) => zip.file(f.name, f.blob));
       const zipBlob = await zip.generateAsync({ type: 'blob' });
-      const zipUrl = URL.createObjectURL(zipBlob);
-      triggerDownloadUrl(zipUrl, `gitdrop-bundle-${Date.now()}.zip`);
-      showToast('Downloaded ZIP archive of all received files!', 'success');
+      triggerDownloadUrl(URL.createObjectURL(zipBlob), `received-files-${Date.now()}.zip`);
     }
 
     function clearReceivedInbox() {
@@ -1340,27 +1152,18 @@ git push -u origin FTP</pre>
       });
       state.receivedFiles = [];
       renderReceivedFiles();
-      showToast('Received inbox cleared.', 'info');
     }
 
     function toggleAutoDownload() {
       const cb = document.getElementById('autoDownloadToggle');
       state.autoDownload = cb ? cb.checked : false;
-      showToast(state.autoDownload ? 'Auto-download enabled for incoming files.' : 'Auto-download disabled.', 'info');
     }
 
-    // --- Instant Text Snippet Transfer ---
     function sendTextSnippet() {
       const input = document.getElementById('snippetInput');
       const text = input ? input.value.trim() : '';
-      if (!text) {
-        showToast('Enter a link or text snippet first.', 'warn');
-        return;
-      }
-      dispatchPacket({
-        kind: 'text-snippet',
-        text
-      });
+      if (!text) return;
+      dispatchPacket({ kind: 'text-snippet', text });
       input.value = '';
     }
 
@@ -1369,40 +1172,27 @@ git push -u origin FTP</pre>
       const countEl = document.getElementById('snippetCount');
       if (!listEl) return;
       if (countEl) countEl.textContent = String(state.receivedSnippets.length);
-
-      if (state.receivedSnippets.length === 0) {
-        listEl.innerHTML = `<div class="text-xs text-slate-500 py-2">No snippets received yet.</div>`;
-        return;
-      }
-
       listEl.innerHTML = state.receivedSnippets.map((s) => `
-        <div class="bg-slate-950 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between gap-2">
-          <div class="font-mono text-xs text-slate-200 truncate">${escapeHtml(s.text)}</div>
-          <button type="button" onclick="copySnippetById('${s.id}')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] text-sky-300 shrink-0">
-            Copy
-          </button>
+        <div class="bg-slate-900 border border-slate-800 rounded-lg p-2 flex items-center justify-between gap-2">
+          <span class="font-mono text-xs text-slate-200 truncate">${escapeHtml(s.text)}</span>
+          <button type="button" onclick="copySnippetById('${s.id}')" class="px-2 py-0.5 rounded bg-slate-800 text-[11px] text-rose-300">Copy</button>
         </div>
       `).join('');
     }
 
     function copySnippetById(id) {
       const item = state.receivedSnippets.find((s) => s.id === id);
-      if (item) copyTextToClipboard(item.text, 'Snippet copied!');
+      if (item) copyTextToClipboard(item.text, 'Copied!');
     }
 
-    // --- GitHub Link Builder ---
     function updateRepoLinkBuilder() {
-      const owner = (document.getElementById('ghOwnerInput')?.value || 'your-username').trim();
-      const repo = (document.getElementById('ghRepoInput')?.value || 'file-transfer-hub').trim();
+      const owner = (document.getElementById('ghOwnerInput')?.value || 'tejo899').trim();
+      const repo = (document.getElementById('ghRepoInput')?.value || 'Applications').trim();
       const path = (document.getElementById('ghFilePathInput')?.value || 'releases/app-release.zip').trim().replace(/^\/+/, '');
-
-      const pagesUrl = `https://${owner}.github.io/${repo}/${path}`;
-      const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/${path}`;
-
       const pagesEl = document.getElementById('ghPagesUrlPreview');
       const rawEl = document.getElementById('ghRawUrlPreview');
-      if (pagesEl) pagesEl.textContent = pagesUrl;
-      if (rawEl) rawEl.textContent = rawUrl;
+      if (pagesEl) pagesEl.textContent = `https://${owner}.github.io/${repo}/${path}`;
+      if (rawEl) rawEl.textContent = `https://raw.githubusercontent.com/${owner}/${repo}/FTP/${path}`;
     }
 
     function escapeHtml(str) {
@@ -1414,40 +1204,31 @@ git push -u origin FTP</pre>
         .replace(/'/g, '&#39;');
     }
 
-    // --- Drag and Drop Listeners ---
     function setupDragAndDrop() {
       const dropZone = document.getElementById('dropZone');
       if (!dropZone) return;
-
-      ['dragenter', 'dragover'].forEach((evtName) => {
-        dropZone.addEventListener(evtName, (e) => {
+      ['dragenter', 'dragover'].forEach((evt) => {
+        dropZone.addEventListener(evt, (e) => {
           e.preventDefault();
           e.stopPropagation();
           dropZone.classList.add('drop-active');
         });
       });
-
-      ['dragleave', 'drop'].forEach((evtName) => {
-        dropZone.addEventListener(evtName, (e) => {
+      ['dragleave', 'drop'].forEach((evt) => {
+        dropZone.addEventListener(evt, (e) => {
           e.preventDefault();
           e.stopPropagation();
           dropZone.classList.remove('drop-active');
         });
       });
-
       dropZone.addEventListener('drop', (e) => {
-        const dt = e.dataTransfer;
-        if (dt && dt.files && dt.files.length > 0) {
-          queueFiles(Array.from(dt.files));
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          queueFiles(Array.from(e.dataTransfer.files));
         }
       });
     }
 
-    // --- Bootstrap on Load ---
     window.addEventListener('DOMContentLoaded', () => {
-      if (window.location.hostname.endsWith('github.io')) {
-        state.loopbackMode = false;
-      }
       setupDragAndDrop();
       syncLoopbackUI();
       renderOutgoingQueue();
@@ -1455,7 +1236,6 @@ git push -u origin FTP</pre>
       renderReceivedSnippets();
       updateRepoLinkBuilder();
       initPeerSession();
-      addSampleTestFile('config');
     });
   </script>
 </body>
