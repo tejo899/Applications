@@ -41,10 +41,9 @@
 </head>
 <body class="min-h-screen text-slate-100 flex flex-col selection:bg-rose-500 selection:text-white">
 
-  <!-- Hidden Native File Inputs Placed OUTSIDE Dropzone so Mobile Never Loops or Crashes -->
-  <input id="fileInput" type="file" multiple class="hidden" onchange="handleFileSelect(event)" />
-  <input id="mediaInput" type="file" accept="image/*,video/*" multiple class="hidden" onchange="handleFileSelect(event)" />
-  <input id="cameraInput" type="file" accept="image/*" capture="environment" class="hidden" onchange="handleFileSelect(event)" />
+  <!-- Safe Native File Inputs: Explicit MIME types bypass Android's buggy multi-app ACTION_CHOOSER (IntentResolver) -->
+  <input id="mediaInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4" multiple class="hidden" onchange="handleFileSelect(event)" />
+  <input id="cameraInput" type="file" accept="application/pdf,application/zip,text/plain,.zip,.apk,.bin,.pdf,.txt,.json,.csv" multiple class="hidden" onchange="handleFileSelect(event)" />
 
   <!-- Toast Container -->
   <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
@@ -194,19 +193,31 @@
           <span id="outgoingTotalSize" class="font-mono text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-300">0 B (<span id="outgoingCount">0</span>)</span>
         </div>
 
-        <!-- Crash-Safe Drop & Tap Area (Inputs are outside this div to prevent mobile event bubbling recursion) -->
+        <!-- Direct Native Input Overlay + Non-Empty accept="" so Android Chrome opens Files directly instead of crashing IntentResolver -->
         <div
           id="dropZone"
-          onclick="openNativeFilePicker(event)"
-          class="border-2 border-dashed border-slate-700 hover:border-rose-500/80 rounded-2xl p-6 text-center cursor-pointer transition bg-slate-950/60 group select-none"
+          class="relative border-2 border-dashed border-slate-700 hover:border-rose-500/80 rounded-2xl p-6 text-center cursor-pointer transition bg-slate-950/60 group select-none overflow-hidden"
         >
-          <div class="w-16 h-16 rounded-full bg-gradient-to-br from-rose-500 to-orange-500 text-white flex items-center justify-center mx-auto mb-3 shadow-lg shadow-rose-500/25 group-hover:scale-105 transition">
-            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
-            </svg>
+          <input
+            id="fileInput"
+            type="file"
+            multiple
+            accept="application/*,text/*,.zip,.apk,.bin,.hex,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.json,.txt,.xml,.7z,.rar,.tar,.gz,.mp3,.mp4,.jpg,.jpeg,.png,.webp"
+            onchange="handleFileSelect(event)"
+            class="
+              absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10
+            "
+            title="Tap to select files"
+          />
+          <div class="pointer-events-none">
+            <div class="w-16 h-16 rounded-full bg-gradient-to-br from-rose-500 to-orange-500 text-white flex items-center justify-center mx-auto mb-3 shadow-lg shadow-rose-500/25 group-hover:scale-105 transition">
+              <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+              </svg>
+            </div>
+            <p class="text-base font-bold text-white">Tap + to Add Files</p>
+            <p class="text-xs text-slate-400 mt-1">Opens system file picker directly (bypasses Android Intent Resolver)</p>
           </div>
-          <p class="text-base font-bold text-white">Tap + to Add Files</p>
-          <p class="text-xs text-slate-400 mt-1">Or drag &amp; drop files here &bull; Full speed P2P</p>
         </div>
 
         <!-- Mobile Quick-Select Buttons (Direct Label Triggers — Zero JS Click Recursion!) -->
@@ -509,7 +520,7 @@ git push -u origin FTP</pre>
       if (event) event.stopPropagation();
     }
 
-    function openNativeFilePicker(event) {
+    async function openNativeFilePicker(event) {
       if (event) {
         event.preventDefault();
         event.stopPropagation();
@@ -517,6 +528,19 @@ git push -u origin FTP</pre>
       if (state.pickerLocked) return;
       state.pickerLocked = true;
       setTimeout(() => { state.pickerLocked = false; }, 600);
+      if (typeof window.showOpenFilePicker === 'function') {
+        try {
+          const handles = await window.showOpenFilePicker({ multiple: true });
+          const files = [];
+          for (const h of handles) {
+            files.push(await h.getFile());
+          }
+          if (files.length > 0) queueFiles(files);
+          return;
+        } catch (err) {
+          if (err && err.name === 'AbortError') return;
+        }
+      }
       const input = document.getElementById('fileInput');
       if (input) input.click();
     }
